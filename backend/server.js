@@ -41,33 +41,20 @@ async function fetchNOAA(url, timeout = 15000) {
  */
 app.get('/api/alerts', async (req, res) => {
   try {
-    const {
-      status = 'actual',
-      message_type = 'alert',
-      limit = 500,
-      ...rest
-    } = req.query;
-
-    // Build a cache key from all relevant query params
-    const cacheKey = `alerts_${JSON.stringify({ status, message_type, limit, ...rest })}`;
-
+    const cacheKey = 'alerts_active';
     const cached = alertCache.get(cacheKey);
     if (cached) {
       return res.json({ ...cached, _meta: { cached: true } });
     }
 
-    const params = new URLSearchParams({ status, message_type, limit, ...rest }).toString();
-    const url = `${NOAA_BASE}/alerts/active?${params}`;
-
-    console.log(`[NOAA] Fetching: ${url}`);
-    const data = await fetchNOAA(url);
+    console.log('[NOAA] Fetching active alerts…');
+    const data = await fetchNOAA(`${NOAA_BASE}/alerts/active`);
     alertCache.set(cacheKey, data);
 
     res.json({ ...data, _meta: { cached: false, fetchedAt: new Date().toISOString() } });
   } catch (err) {
-    const status = err.response?.status || 500;
     console.error('[/api/alerts]', err.message);
-    res.status(status).json({ error: 'Failed to fetch NOAA alerts', details: err.message });
+    res.status(500).json({ error: 'Failed to fetch NOAA alerts', details: err.message });
   }
 });
 
