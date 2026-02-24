@@ -20,11 +20,12 @@ const API_BASE = import.meta.env.VITE_API_URL ?? '';
  *   refetch     – call to trigger a manual refresh
  */
 export function useAlerts() {
-  const [alerts, setAlerts]           = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState(null);
-  const [lastUpdated, setLastUpdated] = useState(null);
-  const [totalCount, setTotalCount]   = useState(0);
+  const [alerts, setAlerts]                   = useState([]);
+  const [zoneGeometries, setZoneGeometries]   = useState({});
+  const [loading, setLoading]                 = useState(true);
+  const [error, setError]                     = useState(null);
+  const [lastUpdated, setLastUpdated]         = useState(null);
+  const [totalCount, setTotalCount]           = useState(0);
 
   const mountedRef = useRef(true);
 
@@ -44,6 +45,7 @@ export function useAlerts() {
       });
 
       setAlerts(features);
+      setZoneGeometries(data.zoneGeometries ?? {});
       setTotalCount(data.pagination?.total ?? features.length);
       setLastUpdated(new Date());
       setError(null);
@@ -64,5 +66,5 @@ export function useAlerts() {
     return () => { mountedRef.current = false; };
   }, [fetchAlerts]);
 
-  return { alerts, loading, error, lastUpdated, totalCount, refetch };
+  return { alerts, zoneGeometries, loading, error, lastUpdated, totalCount, refetch };
 }

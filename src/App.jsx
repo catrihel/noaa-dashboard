@@ -14,7 +14,7 @@ const DEFAULT_FILTERS = {
 };
 
 export default function App() {
-  const { alerts, loading, error, lastUpdated, totalCount, refetch } = useAlerts();
+  const { alerts, zoneGeometries, loading, error, lastUpdated, totalCount, refetch } = useAlerts();
 
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [filters, setFilters]             = useState(DEFAULT_FILTERS);
@@ -112,6 +112,7 @@ export default function App() {
         <div className="flex-1 relative overflow-hidden">
           <MapView
             alerts={alerts}
+            zoneGeometries={zoneGeometries}
             filteredAlerts={filteredAlerts}
             filteredIds={filteredIds}
             selectedAlert={selectedAlert}

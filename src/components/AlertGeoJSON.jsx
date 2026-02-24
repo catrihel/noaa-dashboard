@@ -16,7 +16,7 @@ import { getSeverityConfig } from '../utils/severity';
  *   selectedId   – id of the currently selected alert (highlighted)
  *   onAlertClick – (feature) => void
  */
-export default function AlertGeoJSON({ alerts, filteredIds, selectedId, onAlertClick }) {
+export default function AlertGeoJSON({ alerts, zoneGeometries, filteredIds, selectedId, onAlertClick }) {
   const map      = useMap();
   const groupRef = useRef(null);
 
@@ -38,7 +38,17 @@ export default function AlertGeoJSON({ alerts, filteredIds, selectedId, onAlertC
     group.clearLayers();
 
     alerts.forEach((alert) => {
-      if (!alert.geometry) return;
+      // Use the alert's inline geometry, or fall back to a GeometryCollection
+      // built from its UGC zone codes (most NOAA alerts have no inline polygon).
+      let geometry = alert.geometry;
+      if (!geometry && zoneGeometries) {
+        const ugc       = alert.properties?.geocode?.UGC ?? [];
+        const zoneGeoms = ugc.map(c => zoneGeometries[c]).filter(Boolean);
+        if (zoneGeoms.length > 0) {
+          geometry = { type: 'GeometryCollection', geometries: zoneGeoms };
+        }
+      }
+      if (!geometry) return;
 
       const id       = alert.id ?? alert.properties?.id;
       const cfg      = getSeverityConfig(alert.properties?.severity);
@@ -57,7 +67,7 @@ export default function AlertGeoJSON({ alerts, filteredIds, selectedId, onAlertC
 
       try {
         const geoLayer = L.geoJSON(
-          { type: 'Feature', geometry: alert.geometry, properties: alert.properties ?? {} },
+          { type: 'Feature', geometry, properties: alert.properties ?? {} },
           {
             style:          () => baseStyle,
             onEachFeature:  (_, lyr) => {
@@ -97,7 +107,7 @@ export default function AlertGeoJSON({ alerts, filteredIds, selectedId, onAlertC
         // Skip features with malformed geometry silently
       }
     });
-  }, [alerts, filteredIds, selectedId, onAlertClick]);
+  }, [alerts, zoneGeometries, filteredIds, selectedId, onAlertClick]);
 
   return null;
 }

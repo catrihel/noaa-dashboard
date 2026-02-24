@@ -4,5 +4,8 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  # Set VITE_API_URL in the Netlify UI after you deploy the backend:
-  # Site settings → Environment variables → Add: VITE_API_URL = https://your-backend.railway.app
+
+[functions]
+  # Zone geometry batch-fetching on first cold refresh needs extra time.
+  # After the first refresh the zone cache is warm and this limit is never hit.
+  timeout = 26
