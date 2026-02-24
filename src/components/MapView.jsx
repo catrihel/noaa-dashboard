@@ -3,40 +3,44 @@ import { MapContainer, TileLayer, ZoomControl, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import AlertGeoJSON from './AlertGeoJSON';
 import StateAlertCounts from './StateAlertCounts';
+import { STATE_CENTROIDS } from '../utils/centroids';
 
-const US_CENTER  = [38.5, -96];
-const US_ZOOM    = 4;
-const US_BOUNDS  = [[15, -170], [72, -60]];
+const US_CENTER = [38.5, -96];
+const US_ZOOM   = 4;
+const US_BOUNDS = [[15, -170], [72, -60]];
 
-const TILE_URL  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+// CartoDB Positron — clean light basemap, no API key
+const TILE_URL  = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
 const TILE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
 /**
- * Exposes navigation helpers via mapRef so the parent can call them:
- *   mapRef.current.flyToBounds(geometry)   – fly to a GeoJSON geometry
- *   mapRef.current.flyToLatLng(lat, lng)   – fly to a point (fallback for no-geometry alerts)
+ * Watches selectedAlert and flies to it every time it changes.
+ * map.stop() before each animation prevents stacking from rapid clicks.
  */
-function MapController({ mapRef }) {
+function MapController({ selectedAlert }) {
   const map = useMap();
 
   useEffect(() => {
-    if (!mapRef) return;
-    mapRef.current = {
-      flyToBounds(geometry) {
-        if (!geometry) return;
-        try {
-          const bounds = L.geoJSON(geometry).getBounds();
-          if (bounds.isValid()) {
-            map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 10, duration: 0.75 });
-          }
-        } catch { /* ignore malformed geometry */ }
-      },
+    if (!selectedAlert) return;
 
-      flyToLatLng(lat, lng, zoom = 7) {
-        map.flyTo([lat, lng], zoom, { duration: 0.75 });
-      },
-    };
-  }, [map, mapRef]);
+    // Cancel any in-progress pan/zoom before starting a new one
+    map.stop();
+
+    if (selectedAlert.geometry) {
+      try {
+        const bounds = L.geoJSON(selectedAlert.geometry).getBounds();
+        if (bounds.isValid()) {
+          map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 10, duration: 0.65 });
+        }
+      } catch { /* ignore malformed geometry */ }
+    } else {
+      // No polygon — fly to the state centroid mentioned in UGC codes
+      const ugc       = selectedAlert.properties?.geocode?.UGC ?? [];
+      const stateCode = ugc[0]?.slice(0, 2);
+      const centroid  = STATE_CENTROIDS[stateCode];
+      if (centroid) map.flyTo(centroid, 7, { duration: 0.65 });
+    }
+  }, [selectedAlert, map]);
 
   return null;
 }
@@ -47,7 +51,6 @@ export default function MapView({
   filteredIds,
   selectedAlert,
   onAlertSelect,
-  mapRef,
 }) {
   const selectedId = selectedAlert?.id ?? selectedAlert?.properties?.id;
 
@@ -59,7 +62,7 @@ export default function MapView({
       maxBoundsViscosity={0.4}
       zoomControl={false}
       className="w-full h-full"
-      style={{ background: '#0f172a' }}
+      style={{ background: '#e2e8f0' }}
     >
       <TileLayer
         url={TILE_URL}
@@ -70,7 +73,6 @@ export default function MapView({
 
       <ZoomControl position="bottomright" />
 
-      {/* Alert polygons */}
       <AlertGeoJSON
         alerts={alerts}
         filteredIds={filteredIds}
@@ -78,10 +80,9 @@ export default function MapView({
         onAlertClick={onAlertSelect}
       />
 
-      {/* State-level count badges — updates when filters change */}
       <StateAlertCounts alerts={filteredAlerts} />
 
-      <MapController mapRef={mapRef} />
+      <MapController selectedAlert={selectedAlert} />
     </MapContainer>
   );
 }
