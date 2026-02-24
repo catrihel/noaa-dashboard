@@ -5,12 +5,12 @@ import { STATE_CENTROIDS } from '../utils/centroids';
 
 const SEVERITY_ORDER = { Extreme: 0, Severe: 1, Moderate: 2, Minor: 3, Unknown: 4 };
 
-const SEVERITY_COLORS = {
-  Extreme: { bg: '#fef2f2', border: '#fca5a5', dot: '#ef4444', text: '#991b1b' },
-  Severe:  { bg: '#fff7ed', border: '#fdba74', dot: '#f97316', text: '#9a3412' },
-  Moderate:{ bg: '#fefce8', border: '#fde047', dot: '#eab308', text: '#854d0e' },
-  Minor:   { bg: '#eff6ff', border: '#93c5fd', dot: '#3b82f6', text: '#1e40af' },
-  Unknown: { bg: '#f8fafc', border: '#e2e8f0', dot: '#94a3b8', text: '#475569' },
+const SEVERITY_DOT_COLOR = {
+  Extreme: '#ef4444',
+  Severe:  '#f97316',
+  Moderate:'#eab308',
+  Minor:   '#3b82f6',
+  Unknown: '#94a3b8',
 };
 
 function analyzeByState(alerts) {
@@ -31,42 +31,42 @@ function analyzeByState(alerts) {
   return data;
 }
 
-function makeBadge(stateCode, count, worstSeverity) {
-  const pal = SEVERITY_COLORS[worstSeverity] ?? SEVERITY_COLORS.Unknown;
+function bubbleSize(count) {
+  // floor 22px, scales with sqrt of count, capped at 54px
+  return Math.min(Math.max(22, Math.round(22 + Math.sqrt(count) * 6)), 54);
+}
+
+function makeBubble(count, worstSeverity) {
+  const size  = bubbleSize(count);
+  const color = SEVERITY_DOT_COLOR[worstSeverity] ?? SEVERITY_DOT_COLOR.Unknown;
+  const fs    = Math.max(9, Math.round(size * 0.34));
 
   return L.divIcon({
     html: `
-      <div style="
+      <div class="state-bubble" style="
+        width:${size}px;
+        height:${size}px;
+        border-radius:50%;
+        background:${color};
+        border:2px solid rgba(255,255,255,0.7);
+        box-shadow:0 2px 6px rgba(0,0,0,0.25);
         display:flex;
         align-items:center;
-        gap:5px;
-        background:${pal.bg};
-        border:1.5px solid ${pal.border};
-        border-radius:999px;
-        padding:3px 9px 3px 7px;
-        box-shadow:0 2px 8px rgba(0,0,0,0.13), 0 0 0 1px rgba(0,0,0,0.04);
+        justify-content:center;
         font-family:system-ui,sans-serif;
-        white-space:nowrap;
-        pointer-events:none;
-      ">
-        <span style="
-          width:7px;height:7px;border-radius:50%;
-          background:${pal.dot};flex-shrink:0;
-        "></span>
-        <span style="font-size:10px;font-weight:700;color:#475569;letter-spacing:0.04em">
-          ${stateCode}
-        </span>
-        <span style="font-size:13px;font-weight:800;color:${pal.text};line-height:1;letter-spacing:-0.01em">
-          ${count}
-        </span>
-      </div>`,
+        font-size:${fs}px;
+        font-weight:800;
+        color:#fff;
+        line-height:1;
+        cursor:pointer;
+      ">${count}</div>`,
     className: '',
-    iconSize:   [80, 24],
-    iconAnchor: [40, 12],
+    iconSize:   [size, size],
+    iconAnchor: [size / 2, size / 2],
   });
 }
 
-export default function StateAlertCounts({ alerts }) {
+export default function StateAlertCounts({ alerts, onStateClick }) {
   const map      = useMap();
   const groupRef = useRef(null);
 
@@ -87,15 +87,21 @@ export default function StateAlertCounts({ alerts }) {
       const centroid = STATE_CENTROIDS[code];
       if (!centroid || count < 1) return;
 
-      group.addLayer(
-        L.marker(centroid, {
-          icon:         makeBadge(code, count, worstSeverity),
-          interactive:  false,
-          zIndexOffset: 600,
-        })
-      );
+      const marker = L.marker(centroid, {
+        icon:         makeBubble(count, worstSeverity),
+        interactive:  true,
+        zIndexOffset: 600,
+      });
+
+      marker.on('click', () => {
+        map.stop();
+        map.flyTo(centroid, 7, { duration: 0.65 });
+        onStateClick?.(code);
+      });
+
+      group.addLayer(marker);
     });
-  }, [alerts]);
+  }, [alerts, map, onStateClick]);
 
   return null;
 }

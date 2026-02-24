@@ -61,6 +61,7 @@ export default function App() {
   const handleAlertSelect  = useCallback((alert) => setSelectedAlert(alert), []);
   const handleFilterChange = useCallback(patch  => setFilters(prev => ({ ...prev, ...patch })), []);
   const handleClearFilters = useCallback(()     => setFilters(DEFAULT_FILTERS), []);
+  const handleStateClick   = useCallback((code) => setFilters(prev => ({ ...prev, state: code })), []);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -116,6 +117,7 @@ export default function App() {
             filteredIds={filteredIds}
             selectedAlert={selectedAlert}
             onAlertSelect={handleAlertSelect}
+            onStateClick={handleStateClick}
           />
 
           {selectedAlert && (

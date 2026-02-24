@@ -51,6 +51,7 @@ export default function MapView({
   filteredIds,
   selectedAlert,
   onAlertSelect,
+  onStateClick,
 }) {
   const selectedId = selectedAlert?.id ?? selectedAlert?.properties?.id;
 
@@ -80,7 +81,7 @@ export default function MapView({
         onAlertClick={onAlertSelect}
       />
 
-      <StateAlertCounts alerts={filteredAlerts} />
+      <StateAlertCounts alerts={filteredAlerts} onStateClick={onStateClick} />
 
       <MapController selectedAlert={selectedAlert} />
     </MapContainer>

@@ -88,6 +88,15 @@ html, body, #root {
 }
 .pulse-live { animation: pulse-ring 2s infinite; border-radius: 9999px; }
 
+/* ── State bubble hover ─────────────────────────────────────────────────────── */
+.state-bubble {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.state-bubble:hover {
+  transform: scale(1.2);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35) !important;
+}
+
 /* ── Utility ────────────────────────────────────────────────────────────────── */
 .line-clamp-2 {
   display: -webkit-box;
