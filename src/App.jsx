@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useAlerts } from './hooks/useAlerts';
-import { useZoneGeometries } from './hooks/useZoneGeometries';
+import { useCountyGeoJSON } from './hooks/useCountyGeoJSON';
 import Header from './components/Header';
 import QuickFilterBar from './components/QuickFilterBar';
 import Sidebar from './components/Sidebar';
@@ -42,7 +42,7 @@ export default function App() {
     });
   }, [alerts, filters]);
 
-  const zoneGeometries = useZoneGeometries(filteredAlerts);
+  const countyGeometries = useCountyGeoJSON();
 
   const filteredIds = useMemo(
     () => new Set(filteredAlerts.map(a => a.id ?? a.properties?.id)),
@@ -115,7 +115,7 @@ export default function App() {
         <div className="flex-1 relative overflow-hidden">
           <MapView
             alerts={alerts}
-            zoneGeometries={zoneGeometries}
+            countyGeometries={countyGeometries}
             filteredAlerts={filteredAlerts}
             filteredIds={filteredIds}
             selectedAlert={selectedAlert}

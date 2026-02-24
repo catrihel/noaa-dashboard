@@ -16,7 +16,7 @@ import { getSeverityConfig } from '../utils/severity';
  *   selectedId   – id of the currently selected alert (highlighted)
  *   onAlertClick – (feature) => void
  */
-export default function AlertGeoJSON({ alerts, zoneGeometries, filteredIds, selectedId, onAlertClick }) {
+export default function AlertGeoJSON({ alerts, countyGeometries, filteredIds, selectedId, onAlertClick }) {
   const map      = useMap();
   const groupRef = useRef(null);
 
@@ -41,11 +41,14 @@ export default function AlertGeoJSON({ alerts, zoneGeometries, filteredIds, sele
       // Use the alert's inline geometry, or fall back to a GeometryCollection
       // built from its UGC zone codes (most NOAA alerts have no inline polygon).
       let geometry = alert.geometry;
-      if (!geometry && zoneGeometries) {
-        const ugc       = alert.properties?.geocode?.UGC ?? [];
-        const zoneGeoms = ugc.map(c => zoneGeometries[c]).filter(Boolean);
-        if (zoneGeoms.length > 0) {
-          geometry = { type: 'GeometryCollection', geometries: zoneGeoms };
+      if (!geometry && countyGeometries) {
+        // SAME codes: "PSSCCC" format — strip leading digit to get 5-digit FIPS
+        const same        = alert.properties?.geocode?.SAME ?? [];
+        const countyGeoms = same
+          .map(s => s.length === 6 ? countyGeometries[s.slice(1)] : null)
+          .filter(Boolean);
+        if (countyGeoms.length > 0) {
+          geometry = { type: 'GeometryCollection', geometries: countyGeoms };
         }
       }
       if (!geometry) return;
@@ -96,6 +99,7 @@ export default function AlertGeoJSON({ alerts, zoneGeometries, filteredIds, sele
 
                 mouseout(e) {
                   e.target.setStyle(baseStyle);
+                  e.target.closeTooltip();
                 },
               });
             },
@@ -107,7 +111,7 @@ export default function AlertGeoJSON({ alerts, zoneGeometries, filteredIds, sele
         // Skip features with malformed geometry silently
       }
     });
-  }, [alerts, zoneGeometries, filteredIds, selectedId, onAlertClick]);
+  }, [alerts, countyGeometries, filteredIds, selectedId, onAlertClick]);
 
   return null;
 }

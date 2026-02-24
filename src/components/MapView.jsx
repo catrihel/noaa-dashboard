@@ -47,7 +47,7 @@ function MapController({ selectedAlert }) {
 
 export default function MapView({
   alerts,
-  zoneGeometries,
+  countyGeometries,
   filteredAlerts,
   filteredIds,
   selectedAlert,
@@ -77,7 +77,7 @@ export default function MapView({
 
       <AlertGeoJSON
         alerts={alerts}
-        zoneGeometries={zoneGeometries}
+        countyGeometries={countyGeometries}
         filteredIds={filteredIds}
         selectedId={selectedId}
         onAlertClick={onAlertSelect}
