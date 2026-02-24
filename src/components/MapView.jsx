@@ -2,24 +2,23 @@ import { useEffect } from 'react';
 import { MapContainer, TileLayer, ZoomControl, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import AlertGeoJSON from './AlertGeoJSON';
+import StateAlertCounts from './StateAlertCounts';
 
 const US_CENTER  = [38.5, -96];
 const US_ZOOM    = 4;
 const US_BOUNDS  = [[15, -170], [72, -60]];
 
-// CartoDB Dark Matter — free, no API key
-const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const TILE_URL  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 const TILE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
 /**
- * Inner component that gains map access via useMap() and:
- *  - exposes mapRef.flyToBounds for the parent to call
- *  - flies to the selected alert whenever it changes
+ * Exposes navigation helpers via mapRef so the parent can call them:
+ *   mapRef.current.flyToBounds(geometry)   – fly to a GeoJSON geometry
+ *   mapRef.current.flyToLatLng(lat, lng)   – fly to a point (fallback for no-geometry alerts)
  */
-function MapController({ selectedAlert, mapRef }) {
+function MapController({ mapRef }) {
   const map = useMap();
 
-  // Expose flyToBounds through mapRef
   useEffect(() => {
     if (!mapRef) return;
     mapRef.current = {
@@ -28,28 +27,28 @@ function MapController({ selectedAlert, mapRef }) {
         try {
           const bounds = L.geoJSON(geometry).getBounds();
           if (bounds.isValid()) {
-            map.flyToBounds(bounds, { padding: [60, 60], maxZoom: 9, duration: 0.8 });
+            map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 10, duration: 0.75 });
           }
-        } catch { /* ignore */ }
+        } catch { /* ignore malformed geometry */ }
+      },
+
+      flyToLatLng(lat, lng, zoom = 7) {
+        map.flyTo([lat, lng], zoom, { duration: 0.75 });
       },
     };
   }, [map, mapRef]);
 
-  // Fly when selection changes
-  useEffect(() => {
-    if (!selectedAlert?.geometry) return;
-    try {
-      const bounds = L.geoJSON(selectedAlert.geometry).getBounds();
-      if (bounds.isValid()) {
-        map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 9, duration: 0.8 });
-      }
-    } catch { /* ignore */ }
-  }, [selectedAlert, map]);
-
   return null;
 }
 
-export default function MapView({ alerts, filteredIds, selectedAlert, onAlertSelect, mapRef }) {
+export default function MapView({
+  alerts,
+  filteredAlerts,
+  filteredIds,
+  selectedAlert,
+  onAlertSelect,
+  mapRef,
+}) {
   const selectedId = selectedAlert?.id ?? selectedAlert?.properties?.id;
 
   return (
@@ -71,6 +70,7 @@ export default function MapView({ alerts, filteredIds, selectedAlert, onAlertSel
 
       <ZoomControl position="bottomright" />
 
+      {/* Alert polygons */}
       <AlertGeoJSON
         alerts={alerts}
         filteredIds={filteredIds}
@@ -78,7 +78,10 @@ export default function MapView({ alerts, filteredIds, selectedAlert, onAlertSel
         onAlertClick={onAlertSelect}
       />
 
-      <MapController selectedAlert={selectedAlert} mapRef={mapRef} />
+      {/* State-level count badges — updates when filters change */}
+      <StateAlertCounts alerts={filteredAlerts} />
+
+      <MapController mapRef={mapRef} />
     </MapContainer>
   );
 }
