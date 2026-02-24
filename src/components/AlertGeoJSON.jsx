@@ -10,23 +10,33 @@ import { getSeverityConfig } from '../utils/severity';
  * component to avoid reconciliation quirks with react-leaflet v5.
  *
  * Props:
- *   alerts       – raw Feature[] (may include null-geometry items, which are skipped)
- *   filteredIds  – Set<string> of feature IDs that match current filters
- *                  Empty set = show all at full opacity
- *   selectedId   – id of the currently selected alert (highlighted)
- *   onAlertClick – (feature) => void
+ *   alerts           – raw Feature[] (may include null-geometry items, which are skipped)
+ *   countyGeometries – { fipsCode: geometry } map for zone-only alerts
+ *   filteredIds      – Set<string> of feature IDs that match current filters
+ *                      Empty set = show all at full opacity
+ *   selectedId       – id of the currently selected alert (highlighted)
+ *   onAlertClick     – (feature) => void
  */
 export default function AlertGeoJSON({ alerts, countyGeometries, filteredIds, selectedId, onAlertClick }) {
-  const map      = useMap();
-  const groupRef = useRef(null);
+  const map        = useMap();
+  const groupRef   = useRef(null);
+  const tooltipRef = useRef(null);
 
-  // Create the layer group once when the map mounts; remove on unmount.
+  // Create the layer group and ONE shared tooltip when the map mounts.
+  // A single tooltip instance means only one can ever be visible at a time,
+  // which avoids the bringToFront() DOM-reorder issue that drops mouseout
+  // events and leaves per-layer tooltips permanently open.
   useEffect(() => {
     const group = L.layerGroup().addTo(map);
     groupRef.current = group;
+    tooltipRef.current = L.tooltip({ sticky: true, opacity: 0.95 });
     return () => {
       group.remove();
       groupRef.current = null;
+      if (tooltipRef.current) {
+        map.removeLayer(tooltipRef.current);
+        tooltipRef.current = null;
+      }
     };
   }, [map]);
 
@@ -39,7 +49,7 @@ export default function AlertGeoJSON({ alerts, countyGeometries, filteredIds, se
 
     alerts.forEach((alert) => {
       // Use the alert's inline geometry, or fall back to a GeometryCollection
-      // built from its UGC zone codes (most NOAA alerts have no inline polygon).
+      // built from county FIPS codes derived from geocode.SAME.
       let geometry = alert.geometry;
       if (!geometry && countyGeometries) {
         // SAME codes: "PSSCCC" format — strip leading digit to get 5-digit FIPS
@@ -68,26 +78,27 @@ export default function AlertGeoJSON({ alerts, countyGeometries, filteredIds, se
             opacity:     1,
           };
 
+      const p = alert.properties ?? {};
+      const tooltipContent =
+        `<strong style="font-size:12px">${p.event ?? 'Alert'}</strong>` +
+        `<br/><span style="color:#94a3b8;font-size:11px">${p.severity ?? 'Unknown'}</span>` +
+        (p.areaDesc ? `<br/><span style="color:#64748b;font-size:10px">${p.areaDesc.substring(0, 60)}${p.areaDesc.length > 60 ? '…' : ''}</span>` : '');
+
       try {
         const geoLayer = L.geoJSON(
-          { type: 'Feature', geometry, properties: alert.properties ?? {} },
+          { type: 'Feature', geometry, properties: p },
           {
-            style:          () => baseStyle,
-            onEachFeature:  (_, lyr) => {
-              const p = alert.properties ?? {};
-
-              // Tooltip
-              lyr.bindTooltip(
-                `<strong style="font-size:12px">${p.event ?? 'Alert'}</strong>` +
-                `<br/><span style="color:#94a3b8;font-size:11px">${p.severity ?? 'Unknown'}</span>` +
-                (p.areaDesc ? `<br/><span style="color:#64748b;font-size:10px">${p.areaDesc.substring(0, 60)}${p.areaDesc.length > 60 ? '…' : ''}</span>` : ''),
-                { sticky: true },
-              );
-
+            style:         () => baseStyle,
+            onEachFeature: (_, lyr) => {
               lyr.on({
                 click: () => onAlertClick(alert),
 
                 mouseover(e) {
+                  // Show the shared tooltip at the cursor position.
+                  // addTo is idempotent — safe to call even if already on map.
+                  const tt = tooltipRef.current;
+                  if (tt) tt.setContent(tooltipContent).setLatLng(e.latlng).addTo(map);
+
                   if (dimmed) return;
                   e.target.setStyle({
                     ...baseStyle,
@@ -97,9 +108,16 @@ export default function AlertGeoJSON({ alerts, countyGeometries, filteredIds, se
                   e.target.bringToFront();
                 },
 
+                mousemove(e) {
+                  // Keep the tooltip following the cursor.
+                  tooltipRef.current?.setLatLng(e.latlng);
+                },
+
                 mouseout(e) {
+                  // Explicitly remove the shared tooltip from the map.
+                  const tt = tooltipRef.current;
+                  if (tt) map.removeLayer(tt);
                   e.target.setStyle(baseStyle);
-                  e.target.closeTooltip();
                 },
               });
             },
@@ -111,7 +129,7 @@ export default function AlertGeoJSON({ alerts, countyGeometries, filteredIds, se
         // Skip features with malformed geometry silently
       }
     });
-  }, [alerts, countyGeometries, filteredIds, selectedId, onAlertClick]);
+  }, [alerts, countyGeometries, filteredIds, selectedId, onAlertClick, map]);
 
   return null;
 }
