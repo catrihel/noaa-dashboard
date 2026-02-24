@@ -13,12 +13,48 @@ const SEVERITY_DOT_COLOR = {
   Unknown: '#94a3b8',
 };
 
+// State codes we have centroids for — used to distinguish real state UGC prefixes
+// from marine-zone prefixes like AN (Atlantic Near Shore), GM (Gulf of Mexico), PZ (Pacific), etc.
+const STATE_CENTROID_KEYS = new Set(Object.keys(STATE_CENTROIDS));
+
+/**
+ * Returns the set of state codes an alert affects.
+ *
+ * Primary:  UGC codes whose first 2 chars are a known state (e.g. "CAZ001" → "CA").
+ * Fallback: When ALL UGC codes are marine/lake zone prefixes (AN, GM, PZ, LS…),
+ *           parse areaDesc — NOAA consistently appends the 2-letter state to each
+ *           semicolon-separated zone name, e.g. "…Oregon Inlet NC Out 20 to 60 NM".
+ *           We strip "out …" suffixes first so "NM" (nautical miles) isn't mistaken
+ *           for New Mexico.
+ */
+function getStatesFromAlert(alert) {
+  const ugc = alert.properties?.geocode?.UGC ?? [];
+
+  // Primary: UGC prefixes that map to a real state centroid
+  const ugcStates = ugc.map(c => c.slice(0, 2)).filter(s => STATE_CENTROID_KEYS.has(s));
+  if (ugcStates.length > 0) return new Set(ugcStates);
+
+  // Fallback: parse areaDesc for trailing state abbreviations
+  const areaDesc = alert.properties?.areaDesc ?? '';
+  const states   = new Set();
+  areaDesc.split(/[;,]/).forEach(segment => {
+    // Drop "out X to Y NM" nautical-mile range suffix before scanning
+    const text = segment.replace(/\s+out\b.*/i, '').toUpperCase();
+    text.split(/\s+/).forEach(word => {
+      const clean = word.replace(/[^A-Z]/g, '');
+      if (clean.length === 2 && STATE_CENTROID_KEYS.has(clean)) {
+        states.add(clean);
+      }
+    });
+  });
+  return states;
+}
+
 function analyzeByState(alerts) {
   const data = {};
   alerts.forEach(alert => {
-    const ugc      = alert.properties?.geocode?.UGC ?? [];
     const severity = alert.properties?.severity ?? 'Unknown';
-    const states   = new Set(ugc.map(c => c.slice(0, 2)));
+    const states   = getStatesFromAlert(alert);
 
     states.forEach(s => {
       if (!data[s]) data[s] = { count: 0, worstSeverity: 'Unknown' };
