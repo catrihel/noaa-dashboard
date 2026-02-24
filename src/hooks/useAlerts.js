@@ -2,23 +2,22 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { getSeverityOrder } from '../utils/severity';
 
-const POLL_MS = 60_000;
-
 // In dev, VITE_API_URL is undefined → empty string → Vite proxy handles /api/*
-// In prod, set VITE_API_URL=https://your-backend.railway.app in Netlify env vars
+// In prod, Netlify Function intercepts /api/alerts (no env var needed)
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 /**
- * Fetches active NWS alerts via the local proxy and polls every 60 seconds.
+ * Loads NWS alerts once on mount (from the server-side snapshot).
+ * Manual refresh passes ?refresh=1, which tells the Netlify Function
+ * to fetch fresh data from NOAA and save a new snapshot.
  *
  * Returns:
- *   alerts       – Feature[] sorted by severity then newest-first
- *   loading      – true only during the first fetch
- *   error        – error string or null
- *   lastUpdated  – Date of last successful fetch
- *   totalCount   – total reported by NOAA pagination
- *   countdown    – seconds until next auto-refresh
- *   refetch      – call to trigger an immediate refresh + reset timer
+ *   alerts      – Feature[] sorted by severity then newest-first
+ *   loading     – true only during the first fetch
+ *   error       – error string or null
+ *   lastUpdated – Date of last successful fetch
+ *   totalCount  – total reported by NOAA
+ *   refetch     – call to trigger a manual refresh
  */
 export function useAlerts() {
   const [alerts, setAlerts]           = useState([]);
@@ -26,17 +25,13 @@ export function useAlerts() {
   const [error, setError]             = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [totalCount, setTotalCount]   = useState(0);
-  const [countdown, setCountdown]     = useState(POLL_MS / 1000);
 
-  const pollRef      = useRef(null);
-  const tickRef      = useRef(null);
-  const mountedRef   = useRef(true);
+  const mountedRef = useRef(true);
 
-  // ── fetch ──────────────────────────────────────────────────────────────────
-  const fetchAlerts = useCallback(async () => {
+  const fetchAlerts = useCallback(async (refresh = false) => {
     try {
       const { data } = await axios.get(`${API_BASE}/api/alerts`, {
-        params: { status: 'actual', message_type: 'alert', limit: 500 },
+        params: refresh ? { refresh: '1' } : {},
       });
 
       if (!mountedRef.current) return;
@@ -61,46 +56,13 @@ export function useAlerts() {
     }
   }, []);
 
-  // ── countdown tick ─────────────────────────────────────────────────────────
-  const startCountdown = useCallback(() => {
-    clearInterval(tickRef.current);
-    setCountdown(POLL_MS / 1000);
-    tickRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) { clearInterval(tickRef.current); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-  }, []);
+  const refetch = useCallback(() => fetchAlerts(true), [fetchAlerts]);
 
-  // ── manual refresh ─────────────────────────────────────────────────────────
-  const refetch = useCallback(async () => {
-    clearInterval(pollRef.current);
-    await fetchAlerts();
-    startCountdown();
-    pollRef.current = setInterval(async () => {
-      await fetchAlerts();
-      startCountdown();
-    }, POLL_MS);
-  }, [fetchAlerts, startCountdown]);
-
-  // ── mount ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     mountedRef.current = true;
+    fetchAlerts(false);
+    return () => { mountedRef.current = false; };
+  }, [fetchAlerts]);
 
-    fetchAlerts().then(startCountdown);
-
-    pollRef.current = setInterval(async () => {
-      await fetchAlerts();
-      startCountdown();
-    }, POLL_MS);
-
-    return () => {
-      mountedRef.current = false;
-      clearInterval(pollRef.current);
-      clearInterval(tickRef.current);
-    };
-  }, [fetchAlerts, startCountdown]);
-
-  return { alerts, loading, error, lastUpdated, totalCount, countdown, refetch };
+  return { alerts, loading, error, lastUpdated, totalCount, refetch };
 }

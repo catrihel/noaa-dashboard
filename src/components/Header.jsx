@@ -1,8 +1,8 @@
-import { formatCountdown, pluralise } from '../utils/formatters';
+import { pluralise } from '../utils/formatters';
 
 export default function Header({
   totalCount, filteredCount, isFiltered,
-  lastUpdated, countdown,
+  lastUpdated,
   loading, error,
   onRefresh, sidebarOpen, onToggleSidebar,
 }) {
@@ -43,7 +43,7 @@ export default function Header({
           ) : loading ? (
             <><span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse shrink-0" /><span className="text-xs text-slate-400">Loading…</span></>
           ) : (
-            <><span className="w-2 h-2 rounded-full bg-green-500 pulse-live shrink-0" /><span className="text-xs text-slate-400">Live</span></>
+            <><span className="w-2 h-2 rounded-full bg-green-500 shrink-0" /><span className="text-xs text-slate-400">Ready</span></>
           )}
         </div>
 
@@ -66,10 +66,9 @@ export default function Header({
       {/* Right: timestamps + refresh */}
       <div className="flex items-center gap-2 min-w-0">
         {lastUpdated && (
-          <div className="hidden md:flex flex-col items-end leading-none gap-0.5">
-            <span className="text-xs text-slate-400">Updated {lastUpdated.toLocaleTimeString()}</span>
-            <span className="text-xs text-slate-300">Refresh in {formatCountdown(countdown)}</span>
-          </div>
+          <span className="hidden md:block text-xs text-slate-400">
+            Updated {lastUpdated.toLocaleTimeString()}
+          </span>
         )}
         <button
           onClick={onRefresh}

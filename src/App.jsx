@@ -14,7 +14,7 @@ const DEFAULT_FILTERS = {
 };
 
 export default function App() {
-  const { alerts, loading, error, lastUpdated, totalCount, countdown, refetch } = useAlerts();
+  const { alerts, loading, error, lastUpdated, totalCount, refetch } = useAlerts();
 
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [filters, setFilters]             = useState(DEFAULT_FILTERS);
@@ -72,7 +72,6 @@ export default function App() {
         filteredCount={filteredAlerts.length}
         isFiltered={isFiltered}
         lastUpdated={lastUpdated}
-        countdown={countdown}
         loading={loading}
         error={error}
         onRefresh={refetch}
