@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useAlerts } from './hooks/useAlerts';
+import { useZoneGeometries } from './hooks/useZoneGeometries';
 import Header from './components/Header';
 import QuickFilterBar from './components/QuickFilterBar';
 import Sidebar from './components/Sidebar';
@@ -14,7 +15,7 @@ const DEFAULT_FILTERS = {
 };
 
 export default function App() {
-  const { alerts, zoneGeometries, loading, error, lastUpdated, totalCount, refetch } = useAlerts();
+  const { alerts, loading, error, lastUpdated, totalCount, refetch } = useAlerts();
 
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [filters, setFilters]             = useState(DEFAULT_FILTERS);
@@ -40,6 +41,8 @@ export default function App() {
       return true;
     });
   }, [alerts, filters]);
+
+  const zoneGeometries = useZoneGeometries(filteredAlerts);
 
   const filteredIds = useMemo(
     () => new Set(filteredAlerts.map(a => a.id ?? a.properties?.id)),
